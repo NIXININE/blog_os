@@ -15,10 +15,30 @@ pub extern "C" fn _start() -> ! {
 
     blog_os::init();
 
-    x86_64::instructions::interrupts::int3();
+    // x86_64::instructions::interrupts::enable();
+    println!("{}", x86_64::instructions::interrupts::are_enabled());
 
     #[cfg(test)]
     test_main();
+
+    /// factorial function that prints output of each factorial till n in their own line
+    fn fact(n: usize) -> usize {
+        if n == 0 {
+            1
+        } else {
+            let curr = n * fact(n - 1);
+            println!("{} = {}", n, curr);
+            curr
+        }
+    }
+
+    #[allow(unconditional_recursion)]
+    fn stack_overflow() {
+        stack_overflow();
+    }
+    stack_overflow();
+
+    fact(3);
 
     println!("It did not crash!");
 

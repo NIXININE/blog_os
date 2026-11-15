@@ -24,6 +24,10 @@ test = true
 harness = false
 name = "should_panic"
 
+[[test]]
+harness = false
+name = "stack_overflow"
+
 [dependencies]
 bootloader = "0.9"
 spin = "0.5.2"
