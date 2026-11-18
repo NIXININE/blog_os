@@ -6,12 +6,12 @@
 
 use core::panic::PanicInfo;
 
-use blog_os::println;
+use blog_os::{hlt_loop, println};
 
 #[unsafe(no_mangle)] // don't mangle the name of this function
 pub extern "C" fn _start() -> ! {
     test_main();
-    loop {}
+    hlt_loop();
 }
 
 fn test_runner(tests: &[&dyn Fn()]) {

@@ -2,7 +2,7 @@
 #![no_main]
 #![feature(abi_x86_interrupt)]
 
-use blog_os::{QemuExitCode, exit_qemu, serial_print, serial_println};
+use blog_os::{QemuExitCode, exit_qemu, hlt_loop, serial_print, serial_println};
 use core::panic::PanicInfo;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 
@@ -50,5 +50,5 @@ extern "x86-interrupt" fn test_double_fault_handler(
 ) -> ! {
     serial_println!("[ok]");
     exit_qemu(QemuExitCode::Success);
-    loop {}
+    hlt_loop();
 }

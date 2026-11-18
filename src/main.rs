@@ -4,7 +4,7 @@
 #![test_runner(blog_os::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-use blog_os::println;
+use blog_os::{hlt_loop, println};
 use core::panic::PanicInfo;
 
 // static HELLO: &[u8] = b"Hello World!";
@@ -15,7 +15,6 @@ pub extern "C" fn _start() -> ! {
 
     blog_os::init();
 
-    // x86_64::instructions::interrupts::enable();
     println!("{}", x86_64::instructions::interrupts::are_enabled());
 
     #[cfg(test)]
@@ -32,17 +31,11 @@ pub extern "C" fn _start() -> ! {
         }
     }
 
-    #[allow(unconditional_recursion)]
-    fn stack_overflow() {
-        stack_overflow();
-    }
-    stack_overflow();
-
     fact(3);
 
     println!("It did not crash!");
 
-    loop {}
+    hlt_loop();
 }
 
 #[test_case]
@@ -55,7 +48,7 @@ fn trivial_assertion() {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
-    loop {}
+    hlt_loop();
 }
 
 // panic handler in test mode
