@@ -49,24 +49,32 @@ struct Buffer {
 
 pub struct Writer {
     column_position: usize,
+    row_position: usize,
     color_code: ColorCode,
     buffer: &'static mut Buffer,
 }
 
 impl Writer {
+    /// Write a single byte to the VGA buffer
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
+            0x08 => self.backspace(), // handles backspace
             byte => {
+                // if cursor is at last column, reset column
+                // and move cursor to next row
                 if self.column_position >= BUFFER_WIDTH {
-                    self.new_line();
+                    // only move to next line if there is no empty line
+                    // after i.e. currently at last line of buffer
+                    if self.row_position == BUFFER_HEIGHT - 1 {
+                        self.new_line();
+                    }
+                    self.row_position = (self.row_position + 1).min(BUFFER_HEIGHT - 1);
+                    self.column_position = 0;
                 }
 
-                let row = BUFFER_HEIGHT - 1;
-                let col = self.column_position;
-
                 let color_code = self.color_code;
-                self.buffer.chars[row][col].write(ScreenChar {
+                self.buffer.chars[self.row_position][self.column_position].write(ScreenChar {
                     ascii_character: byte,
                     color_code,
                 });
@@ -74,17 +82,25 @@ impl Writer {
             }
         }
     }
+
+    /// Insert new line if cursor at the last row
+    /// of buffer and need to move to next row.
     fn new_line(&mut self) {
-        for row in 1..BUFFER_HEIGHT {
+        let mut start = 0;
+        if self.row_position == BUFFER_HEIGHT - 1 {
+            start += 1;
+        }
+        for row in start..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
                 let character = self.buffer.chars[row][col].read();
                 self.buffer.chars[row - 1][col].write(character);
             }
         }
-        self.clear_row(BUFFER_HEIGHT - 1);
+        self.clear_row(self.row_position);
         self.column_position = 0;
     }
 
+    /// Clear the contents of the specified row.
     fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
@@ -95,11 +111,30 @@ impl Writer {
         }
     }
 
+    /// Handle the functionality of `backspace`.
+    fn backspace(&mut self) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+        // if cursor is at the start of line, pressing `backspace`
+        // also takes cursor to the end of previous row
+        if self.column_position <= 0 {
+            self.column_position = BUFFER_WIDTH;
+            if self.row_position > 0 {
+                self.row_position -= 1;
+                self.column_position = 0;
+            }
+        }
+        self.column_position -= 1;
+        self.buffer.chars[self.row_position][self.column_position].write(blank);
+    }
+
     pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
                 // printable ASCII byte or newline
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                0x20..=0x7e | b'\n' | 0x08 => self.write_byte(byte),
                 // not part of printable ASCII range
                 _ => self.write_byte(0xfe),
             }
@@ -116,25 +151,13 @@ impl fmt::Write for Writer {
     }
 }
 
-/* pub fn print_something() {
-    use core::fmt::Write;
-    let mut writer = Writer {
-        column_position: 0,
-        color_code: ColorCode::new(Color::Yellow, Color::Black),
-        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-    };
-
-    writer.write_byte(b'H');
-    writer.write_string("ello! ");
-    write!(writer, "The numbers are {} and {}", 42, 1.0 / 3.0).unwrap();
-} */
-
 use lazy_static::lazy_static;
 use spin::Mutex;
 
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
+        row_position: BUFFER_HEIGHT - 1,
         color_code: ColorCode::new(Color::Yellow, Color::Black),
         buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
@@ -151,13 +174,16 @@ macro_rules! println {
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
 
-/// Prints the given formatted string to the VGA text buffer through the global `WRITER` instance.
+/// Prints the given formatted string to the VGA text buffer
+/// through the global `WRITER` instance.
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
     use x86_64::instructions::interrupts;
 
-    // To prevent deadlocks from happening when Timer interrupts are raised, use `without_interrupts` method to prevent interrupts from occuring while `_print` takes `WRITER` lock.
+    // To prevent deadlocks from happening when Timer interrupts
+    // are raised, use `without_interrupts` method to prevent
+    // interrupts from occuring while `_print` takes `WRITER` lock.
     interrupts::without_interrupts(|| {
         // Write to the VGA text buffer
         WRITER.lock().write_fmt(args).unwrap()
