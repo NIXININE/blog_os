@@ -120,12 +120,16 @@ impl Writer {
         // if cursor is at the start of line, pressing `backspace`
         // also takes cursor to the end of previous row
         if self.column_position <= 0 {
-            self.column_position = BUFFER_WIDTH;
             if self.row_position > 0 {
                 self.row_position -= 1;
-                self.column_position = 0;
+                self.column_position = BUFFER_WIDTH;
+            }
+            else {
+                // do not change cursor position if currently at (0,0)
+                return;
             }
         }
+        debug_assert!(self.column_position <= BUFFER_WIDTH);
         self.column_position -= 1;
         self.buffer.chars[self.row_position][self.column_position].write(blank);
     }
