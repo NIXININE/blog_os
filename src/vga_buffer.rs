@@ -87,9 +87,14 @@ impl Writer {
     /// of buffer and need to move to next row.
     fn new_line(&mut self) {
         let mut start = 0;
+        self.column_position = 0;
         if self.row_position == BUFFER_HEIGHT - 1 {
             start += 1;
+        } else {
+            self.row_position += 1;
+            return;
         }
+
         for row in start..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
                 let character = self.buffer.chars[row][col].read();
@@ -97,7 +102,6 @@ impl Writer {
             }
         }
         self.clear_row(self.row_position);
-        self.column_position = 0;
     }
 
     /// Clear the contents of the specified row.
@@ -123,8 +127,7 @@ impl Writer {
             if self.row_position > 0 {
                 self.row_position -= 1;
                 self.column_position = BUFFER_WIDTH;
-            }
-            else {
+            } else {
                 // do not change cursor position if currently at (0,0)
                 return;
             }
